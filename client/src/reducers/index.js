@@ -1,28 +1,49 @@
 import {combineReducers} from "redux";
 import {reducer as formReducer} from "redux-form";
-import authApiReducer from "./api/authApiReducer";
-import homeScreenReducer from "./screens/homeScreenReducer";
-import tabHoverEventReducer from "./events/tabHoverEventReducer";
-import filterProductsReducer from "./screens/filter/filterProductsReducer";
-import filterAttributesReducer from "./screens/filter/filterAttributesReducer";
-import {
-    selectGenderReducer, selectApparelReducer,
-    selectBrandReducer, selectPriceReducer,
-    selectSortReducer, selectPageReducer
-} from "./screens/filter/selectedFilterAttributesReducer"
 
+import {
+    homePageDataReducer, addToCartReducer,
+    selectProductDetailReducer, shoppingBagProductReducer,
+    filterProductsReducer, filterAttributesReducer,
+    filterQueryReducer, tabsDataReducer,
+    cartTotalReducer, savedSortedListReducer,
+    shippingAddressReducer, paymentInfoReducer,
+    shippingOptionReducer, deliveryChargesReducer,
+    paymentResponseReducer, signInReducer, signUpReducer,
+    googleAuthReducer, searchKeywordReducer
+} from "./screens/commonScreenReducer";
+
+import {tabHoverEventReducer} from "./events/eventReducer";
+
+import {
+    selectedFilterAttributesReducer,
+    selectSortReducer, selectPageReducer, clearFiltersReducer
+} from "./screens/filter/selectedFilterAttributesReducer"
 
 export default combineReducers({
     form: formReducer,
-    authApiReducer,
-    homeScreenReducer,
+    signInReducer,
+    signUpReducer,
+    homePageDataReducer,
+    addToCartReducer,
     tabHoverEventReducer,
     filterProductsReducer,
     filterAttributesReducer,
-    selectGenderReducer,
-    selectApparelReducer,
-    selectBrandReducer,
-    selectPriceReducer,
     selectSortReducer,
-    selectPageReducer
+    selectPageReducer,
+    selectProductDetailReducer,
+    shoppingBagProductReducer,
+    filterQueryReducer,
+    selectedFilterAttributesReducer,
+    tabsDataReducer,
+    cartTotalReducer,
+    savedSortedListReducer,
+    shippingAddressReducer,
+    paymentInfoReducer,
+    shippingOptionReducer,
+    deliveryChargesReducer,
+    paymentResponseReducer,
+    googleAuthReducer,
+    searchKeywordReducer,
+    clearFiltersReducer
 });

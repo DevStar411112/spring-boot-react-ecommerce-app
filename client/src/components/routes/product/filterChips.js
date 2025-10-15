@@ -3,27 +3,34 @@ import {useDispatch, useSelector} from "react-redux";
 import Chip from "@material-ui/core/Chip";
 import Box from '@material-ui/core/Box';
 import log from "loglevel";
-import {
-    ADD_APPAREL_CATEGORY,
-    ADD_BRAND_CATEGORY,
-    ADD_GENDER_CATEGORY,
-    ADD_PRICE_CATEGORY
-} from "../../../actions/types";
+import {ADD_SELECTED_CATEGORY} from "../../../actions/types";
+import history from "../../../history";
+import {PRODUCT_BY_CATEGORY_DATA_API} from "../../../constants/api_routes";
+import {toggleId} from "../../../helper/toggleId";
+import {updateQueryString} from "../../../helper/updateQueryString";
 
 const FilterChips = () => {
-    const selectedGenders = useSelector(state => state.selectGenderReducer)
-    const selectedApparels = useSelector(state => state.selectApparelReducer)
-    const selectedBrands = useSelector(state => state.selectBrandReducer)
-    const selectedPriceRanges = useSelector(state => state.selectPriceReducer)
+    const selectedGenders = useSelector(state => state.selectedFilterAttributesReducer.genders)
+    const selectedApparels = useSelector(state => state.selectedFilterAttributesReducer.apparels)
+    const selectedBrands = useSelector(state => state.selectedFilterAttributesReducer.brands)
+    const selectedPriceRanges = useSelector(state => state.selectedFilterAttributesReducer.prices)
     const dispatch = useDispatch()
 
+    // check if any filter is selected or not
     if ((selectedGenders.length + selectedApparels.length
         + selectedBrands.length + selectedPriceRanges.length) === 0) {
         log.debug(`[FilterChips] Filter are empty`)
         return null
     }
 
-    const addBoxTagToList = (selectedAttrList, categoryId) => {
+    /**
+     * construct the chip from selected filter option and assign Id.
+     *
+     * @param selectedAttrList
+     * @param categoryId
+     * @returns {[]}
+     */
+    const addChips = (selectedAttrList, categoryId) => {
         let chipBoxList = []
         log.debug(`[FilterChips] addBoxTagToList boxDataList = ${JSON.stringify(selectedAttrList)}`)
 
@@ -41,21 +48,25 @@ const FilterChips = () => {
         return chipBoxList
     }
 
+    /**
+     * Prepare chip list and render it.
+     * @returns {null|[]}
+     */
     const renderChipBoxes = () => {
         log.debug(`[FilterChips] renderChipBoxes is invoked`)
 
         let chipBoxList = []
         if (selectedGenders.length > 0) {
-            chipBoxList = chipBoxList.concat(addBoxTagToList(selectedGenders, "ge"))
+            chipBoxList = chipBoxList.concat(addChips(selectedGenders, "ge"))
         }
         if (selectedApparels.length > 0) {
-            chipBoxList = chipBoxList.concat(addBoxTagToList(selectedApparels, "ap"))
+            chipBoxList = chipBoxList.concat(addChips(selectedApparels, "ap"))
         }
         if (selectedBrands.length > 0) {
-            chipBoxList = chipBoxList.concat(addBoxTagToList(selectedBrands, "br"))
+            chipBoxList = chipBoxList.concat(addChips(selectedBrands, "br"))
         }
         if (selectedPriceRanges.length > 0) {
-            chipBoxList = chipBoxList.concat(addBoxTagToList(selectedPriceRanges, "pr"))
+            chipBoxList = chipBoxList.concat(addChips(selectedPriceRanges, "pr"))
         }
 
         if (chipBoxList) {
@@ -67,40 +78,75 @@ const FilterChips = () => {
         return null
     }
 
-    const findValueAndDispatch = (actionType, id, selectedAttrList) => {
+    /**
+     * Dispatch the chip from selected option list
+     *
+     * @param id
+     * @param selectedAttrList
+     * @param attributeName
+     */
+    const findValueAndDispatch = (id, selectedAttrList, attributeName) => {
         log.debug(`[FilterChips] findValueAndDispatch id = ${id}`+
-            `, actionType = ${actionType}, selectedAttrList = ${JSON.stringify(selectedAttrList)}`)
+            `, attributeName = ${attributeName}, selectedAttrList = ${JSON.stringify(selectedAttrList)}`)
 
         for (let i = 0; i < selectedAttrList.length; i++) {
             if(selectedAttrList[i].id === parseInt(id)) {
-                log.info(`[FilterChips] id = ${id} dispatch for actionType = ${actionType}`)
+                log.info(`[FilterChips] id = ${id} dispatch`)
                 dispatch({
-                    type: actionType,
+                    type: ADD_SELECTED_CATEGORY,
                     payload: {
-                        id: selectedAttrList[i].id,
-                        value: selectedAttrList[i].value
+                        [attributeName]: {
+                            id: selectedAttrList[i].id,
+                            value: selectedAttrList[i].value
+                        },
+                        newQuery: null
                     }
                 })
+
+                const {ids} = toggleId(selectedAttrList[i].id, selectedAttrList[i].value, selectedAttrList)
+                let queryString = updateQueryString(history, attributeName, selectedAttrList[i].id, ids)
+
+                let URL = ""
+                if(!queryString.startsWith(PRODUCT_BY_CATEGORY_DATA_API)) {
+                    URL += PRODUCT_BY_CATEGORY_DATA_API
+                }
+
+                if(!queryString.startsWith(`?q=`)) {
+                    URL += `?q=`
+                }
+
+                if(URL !== "") {
+                    history.push(URL + queryString)
+                } else {
+                    history.push(queryString)
+                }
+
+
                 return
             }
         }
     }
 
-    const handleDelete = (id) => () => {
+    /**
+     * Delete the chip
+     * @param id
+     * @returns {function(...[*]=)}
+     */
+    const handleDelete = id => () => {
         log.info(`[FilterChips] handleDelete for chip for id = ${id}`)
         const splitId = id.split("-")
 
         if(selectedGenders.length > 0 && splitId[0].localeCompare("ge") === 0) {
-            findValueAndDispatch(ADD_GENDER_CATEGORY, splitId[1], selectedGenders)
+            findValueAndDispatch(splitId[1], selectedGenders, "genders")
         }
         if(selectedApparels.length > 0 && splitId[0].localeCompare("ap") === 0) {
-            findValueAndDispatch(ADD_APPAREL_CATEGORY, splitId[1], selectedApparels)
+            findValueAndDispatch(splitId[1], selectedApparels, "apparels")
         }
         if(selectedBrands.length > 0 && splitId[0].localeCompare("br") === 0) {
-            findValueAndDispatch(ADD_BRAND_CATEGORY, splitId[1], selectedBrands)
+            findValueAndDispatch(splitId[1], selectedBrands, "brands")
         }
         if(selectedPriceRanges.length > 0 && splitId[0].localeCompare("pr") === 0) {
-            findValueAndDispatch(ADD_PRICE_CATEGORY, splitId[1], selectedPriceRanges)
+            findValueAndDispatch(splitId[1], selectedPriceRanges, "prices")
         }
     }
 

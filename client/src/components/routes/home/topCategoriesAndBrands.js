@@ -1,42 +1,19 @@
 import React from 'react';
-import Grid from '@material-ui/core/Grid';
-import {Typography} from "@material-ui/core";
+import {Grid} from "@material-ui/core";
 import {Link} from "react-router-dom";
 import log from 'loglevel';
 import {MAX_PRODUCTS_PER_PAGE} from "../../../constants/constants";
 import {useSelector} from "react-redux";
-import Box from "@material-ui/core/Box";
-import Hidden from "@material-ui/core/Hidden";
 
 const queryType = {
     brand: 1,
     apparel: 2
 }
 
-const headerStyles = {
-    padding: '30px 0 0 30px',
-    textDecoration: 'underline',
-}
-
 const TopCategoriesAndBrands = () => {
-    const homeAPIData = useSelector(state => state.homeScreenReducer ? state.homeScreenReducer : null)
-
-    if (!homeAPIData) {
-        log.debug("[TopCategoriesAndBrands]: homeAPIData is null")
-        return null
-    } else if (!homeAPIData.brands) {
-        log.debug("[TopCategoriesAndBrands]: homeAPIData.brands is null")
-        return null
-    } else if (!homeAPIData.apparels) {
-        log.debug("[TopCategoriesAndBrands]: homeAPIData.apparels is null")
-        return null
-    }
+    const homeAPIData = useSelector(state => state.homePageDataReducer)
 
     const renderImageList = (imageList, filterQueryType) => {
-        if (imageList == null) {
-            log.debug(`[TopCategoriesAndBrands]: imageList is null`)
-            return null
-        }
 
         return imageList.map(info => {
 
@@ -45,11 +22,11 @@ const TopCategoriesAndBrands = () => {
             // prepare query parameters
             switch (filterQueryType) {
                 case queryType.brand:
-                    filterQuery = info.brandInfo ? `brand=${info.brandInfo.id}` : null
+                    filterQuery = info.brandInfo ? `brands=${info.brandInfo.id}` : null
                     break
                 case queryType.apparel:
                     if (info.apparelInfo && info.genderInfo) {
-                        filterQuery = `apparel=${info.apparelInfo.id}::gender=${info.genderInfo.id}`
+                        filterQuery = `apparels=${info.apparelInfo.id}::genders=${info.genderInfo.id}`
                     }
                     break
                 default:
@@ -59,42 +36,26 @@ const TopCategoriesAndBrands = () => {
 
             log.trace(`[TopCategoriesAndBrands]: filterQuery = ${filterQuery}, filterQueryType = ${filterQueryType}`)
             return (
-                <Box key={info.title} css={{maxHeight: 400, maxWidth: 200}}>
+                <Grid item xs={6} sm={2} key={info.title} style={{textAlign: "center"}}>
                     <Link to={`/products?q=${filterQuery}::page=0,${MAX_PRODUCTS_PER_PAGE}`}>
-                        <img src={info.filePath} alt={info.filePath} style={{width: '90%', height: '100%'}}
+                        <img src={info.imageURL} alt={info.imageLocalPath} style={{width: '80%', height: '100%'}}
                              title={info.title}/>
                     </Link>
-                </Box>
+                </Grid>
             )
         });
     };
 
-    const renderDesktopSection = (title, dataList, queryType) => {
+    const renderCategoryAndBrandsList = (title, dataList, queryType) => {
         return (
             <>
-                <Box display="flex" justifyContent="center" style={{backgroundColor: "pink", marginTop: 30}}>
-                    <Typography variant="h4" noWrap style={{fontWeight: "bold"}}>
-                        {title}
-                    </Typography>
-                </Box>
-                <Box display="flex" justifyContent="center" flexWrap="nowrap" style={{padding: '30px 0 0 0'}}>
+                <Grid container style={{fontWeight: "bold",
+                    fontSize: "2rem", padding: "2rem 0 0 1rem", textDecoration: "underline"}}>
+                    {title}
+                </Grid>
+                <Grid container style={{padding: '2rem 0'}}>
                     {renderImageList(dataList, queryType)}
-                </Box>
-            </>
-        )
-    }
-
-    const renderMobileSection = (title, dataList, queryType) => {
-        return (
-            <>
-                <Box display="flex" justifyContent="center" style={{backgroundColor: "pink"}}>
-                    <Typography variant="h4" style={{fontWeight: "bold"}}>
-                        {title}
-                    </Typography>
-                </Box>
-                <Box display="flex" justifyContent="center" flexWrap="wrap" style={{padding: '50px 0 30px 0'}}>
-                    {renderImageList(dataList, queryType)}
-                </Box>
+                </Grid>
             </>
         )
     }
@@ -102,17 +63,10 @@ const TopCategoriesAndBrands = () => {
     log.info("[TopCategoriesAndBrands]: Rendering TopCategoriesAndBrands Component")
 
     return (
-        <div>
-            <Hidden xsDown>
-                {renderDesktopSection("#Shop Top Brands", homeAPIData.brands, queryType.brand)}
-                {renderDesktopSection("#Shop Top Categories", homeAPIData.apparels, queryType.apparel)}
-            </Hidden>
-
-            <Hidden smUp>
-                {renderMobileSection("#Shop Top Brands", homeAPIData.brands, queryType.brand)}
-                {renderMobileSection("#Shop Top Categories", homeAPIData.apparels, queryType.apparel)}
-            </Hidden>
-        </div>
+        <>
+            {renderCategoryAndBrandsList("#Shop Top Brands", homeAPIData.data.brands, queryType.brand)}
+            {renderCategoryAndBrandsList("#Shop Top Categories", homeAPIData.data.apparels, queryType.apparel)}
+        </>
     )
 };
 export default TopCategoriesAndBrands;

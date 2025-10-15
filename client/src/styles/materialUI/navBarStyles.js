@@ -1,14 +1,11 @@
 import {fade, makeStyles} from "@material-ui/core/styles";
 
 const useNavBarStyles = makeStyles(theme => ({
-    grow_1: {
-        flex: 1,
-    },
-    grow_3: {
-        flex: 2,
-    },
     growQuarter: {
         flexGrow: 0.25,
+    },
+    growHalf: {
+        flexGrow: 0.5,
     },
     menuButton: {
         marginRight: theme.spacing(2),
@@ -16,15 +13,9 @@ const useNavBarStyles = makeStyles(theme => ({
     appBarRoot: {
         boxShadow: "none !important",
         height: 80,
-        [theme.breakpoints.down("xs")]: {
-            height: 60,
-        }
     },
     toolBarRoot: {
         minHeight: 80,
-        [theme.breakpoints.down("xs")]: {
-            minHeight: 60,
-        }
     },
     title: {
         flexGrow: 1,
@@ -38,8 +29,20 @@ const useNavBarStyles = makeStyles(theme => ({
         },
         [theme.breakpoints.down("sm")]: {
             display: "block",
-            fontSize: "1.5rem",
+            fontSize: "1.8rem",
             paddingBottom: 0,
+        },
+    },
+    autoCompleteSearchBarRoot: {
+        [theme.breakpoints.down("xs")]: {
+            height: 80,
+            paddingTop: "0.5rem",
+            left: 0,
+            backgroundColor: "#fff",
+            overflow: 'visible',
+            position: 'absolute',
+            alignSelf: 'center',
+            zIndex: '1001',
         },
     },
     searchContainer: {
@@ -107,6 +110,7 @@ const useNavBarStyles = makeStyles(theme => ({
             width: '0ch',
             '&:focus': {
                 width: '40ch',
+                backgroundColor: fade(theme.palette.common.white, 0.9),
             },
         },
         [theme.breakpoints.up("sm")]: {
@@ -128,13 +132,15 @@ const useNavBarStyles = makeStyles(theme => ({
     sectionDesktop: {
         display: "none",
         [theme.breakpoints.up("md")]: {
-            display: "flex"
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center"
         }
     },
     sectionMobile: {
         display: "flex",
-        [theme.breakpoints.up("md")]: {
-            display: "none"
+        [theme.breakpoints.up("sm")]: {
+            display: "none",
         }
     },
     iconButtonRoot: {
@@ -146,7 +152,7 @@ const useNavBarStyles = makeStyles(theme => ({
     },
     mobileSearchButton: {
         alignSelf: "flex-end"
-    }
+    },
 }));
 
 export default useNavBarStyles;

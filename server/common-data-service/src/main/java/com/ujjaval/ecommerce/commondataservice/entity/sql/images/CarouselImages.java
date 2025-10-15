@@ -9,23 +9,27 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import java.io.Serializable;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString
 @Entity
-public class CarouselImages {
+public class CarouselImages implements Serializable {
     @Id
     @GeneratedValue(strategy= GenerationType.IDENTITY)
     private int id;
 
-    private String title;
+    private String link;
 
-    private String filePath;
+    private String imageLocalPath;
 
-    public CarouselImages(String title, String filePath) {
-        this.title = title;
-        this.filePath = filePath;
+    private String imageURL;
+
+    public CarouselImages(String link, String imageLocalPath, String imageURL) {
+        this.link = link;
+        this.imageLocalPath = imageLocalPath;
+        this.imageURL = imageURL;
     }
 }

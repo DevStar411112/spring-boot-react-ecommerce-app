@@ -1,175 +1,217 @@
 package com.ujjaval.ecommerce.commondataservice.dao.sql.info.impl;
 
+import com.ujjaval.ecommerce.commondataservice.dao.sql.info.queryhelpers.ProductQueryHelper;
+import com.ujjaval.ecommerce.commondataservice.dao.sql.info.queryhelpers.context.ParamsToQueryContext;
+import com.ujjaval.ecommerce.commondataservice.dto.*;
 import com.ujjaval.ecommerce.commondataservice.entity.sql.info.ProductInfo;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.ujjaval.ecommerce.commondataservice.model.FilterAttributesResponse;
+import com.ujjaval.ecommerce.commondataservice.model.HomeTabsDataResponse;
+import com.ujjaval.ecommerce.commondataservice.utils.resulttransformers.ListResultTransformer;
+import org.javatuples.Pair;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.TypedQuery;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class ProductInfoRepositoryImpl {
-
-    enum QueryType {
-        gender, apparel, brand, price, category, sortby, page;
-
-        enum MathOperator {
-            bt, lt, gt
-        }
-
-        enum SortOperator {
-            lh, hl, ratings, newest
-        }
-    }
-
-    private final int NEWEST = 1;
-    private final int POPULARITY = 2;
-    private final int LOW_TO_HIGH = 3;
-    private final int HIGH_TO_LOW = 4;
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    class MapParameterKey {
-        private Integer key = 1;
-
-        public void increment() {
-            ++key;
-        }
-    }
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    public void prepareConditionListById(HashMap<Integer, Object> mapParameters, String data, MapParameterKey mapParametersKey,
-                                         List<String> conditions, String field) {
-        List<String> tempList = new ArrayList<>();
+    public Pair<Long, List<ProductInfo>> getProductsByCategories(HashMap<String, String> conditionMap) {
+        ParamsToQueryContext paramsToQueryContext = new ProductQueryHelper().getParamsToQueryMap(conditionMap);
 
-        for (String val : data.split(",")) {
-            mapParameters.put(mapParametersKey.getKey(), Integer.parseInt(val));
-            tempList.add("?" + mapParametersKey.getKey());
-            mapParametersKey.increment();
+        String sortBy = paramsToQueryContext.getSortBy();
+        HashMap<Integer, Object> mapParams = paramsToQueryContext.getMapParams();
+        List<String> conditions = paramsToQueryContext.getConditions();
+        String[] pageInfo = paramsToQueryContext.getPageInfo();
+
+        TypedQuery<Long> totalCountQuery = (TypedQuery<Long>) entityManager.createQuery(
+                "select count(*) from ProductInfo p where "
+                        + String.join(" AND ", conditions));
+
+        mapParams.forEach(totalCountQuery::setParameter);
+
+        List<Long> totalCountQueryResultList = totalCountQuery.getResultList();
+
+        if (totalCountQueryResultList != null && totalCountQueryResultList.get(0) > 0) {
+            Long totalCount = totalCountQueryResultList.get(0);
+
+            TypedQuery<ProductInfo> query = entityManager.createQuery(
+                    "select p from ProductInfo p where "
+                            + String.join(" AND ", conditions) + sortBy, ProductInfo.class);
+
+            mapParams.forEach(query::setParameter);
+
+            if (pageInfo != null && pageInfo.length == 2) {
+                return new Pair<>(totalCount, query.setFirstResult(Integer.parseInt(pageInfo[0]))
+                        .setMaxResults(Integer.parseInt(pageInfo[1]))
+                        .getResultList());
+            }
+
+            return new Pair<>(totalCount, query.getResultList());
         }
-        if (data.length() > 0) {
-            conditions.add(String.format("(%s IN (%s))", field, String.join(",", tempList)));
-        }
+        return null;
     }
 
-    public List<ProductInfo> getProductInfoByCategories(HashMap<String, String> conditionMap) {
-        if (conditionMap == null) {
-            return null;
-        }
+    public List<ProductInfo> getProductsById(String[] product_ids_str) {
+        List<Integer> productIds = new ArrayList<>();
 
-        String[] pageInfo = null;
-        List<String> conditions = new ArrayList<>();
-        String sortBy = " order by p.ratings desc";
-        HashMap<Integer, Object> mapParams = new HashMap<>();
-        MapParameterKey mapParametersKey = new MapParameterKey();
-
-        for (Map.Entry<String, String> entry : conditionMap.entrySet()) {
-            switch (QueryType.valueOf(entry.getKey())) {
-                case gender:
-                    prepareConditionListById(mapParams, entry.getValue(), mapParametersKey,
-                            conditions, "p.genderCategory.id");
-                    break;
-
-                case apparel:
-                    prepareConditionListById(mapParams, entry.getValue(), mapParametersKey,
-                            conditions, "p.apparelCategory.id");
-                    break;
-
-                case brand:
-                    prepareConditionListById(mapParams, entry.getValue(), mapParametersKey,
-                            conditions, "p.productBrandCategory.id");
-                    break;
-
-                case price:
-                    // eg bt:100,1000
-                    String extractedValue = entry.getValue().substring(3);
-                    String[] prices = extractedValue.split(",");
-                    switch (QueryType.MathOperator.valueOf(entry.getValue().substring(0, 2))) {
-                        case bt:
-                            conditions.add(String.format(" (p.price between ?%d AND ?%d)", mapParametersKey.getKey(),
-                                    mapParametersKey.getKey() + 1));
-                            mapParams.put(mapParametersKey.getKey(), Double.parseDouble(prices[0]));
-                            mapParametersKey.increment();
-                            mapParams.put(mapParametersKey.getKey(), Double.parseDouble(prices[1]));
-                            mapParametersKey.increment();
-                            break;
-                        case lt:
-                            conditions.add(String.format(" (p.price <= ?%d)", mapParametersKey.getKey()));
-                            mapParams.put(mapParametersKey.getKey(), Double.parseDouble(prices[0]));
-                            mapParametersKey.increment();
-                            break;
-                        case gt:
-                            conditions.add(String.format(" (p.price >= ?%d)", mapParametersKey.getKey()));
-                            mapParams.put(mapParametersKey.getKey(), Double.parseDouble(prices[0]));
-                            mapParametersKey.increment();
-                            break;
-                        default:
-                            System.out.println("UnsupportedType");
-                    }
-                    break;
-
-                case category:
-                    if (entry.getValue().equals("all")) {
-                        System.out.println("Coming here in the category......");
-                        conditions.add(String.format(" (1 = ?%d)", mapParametersKey.getKey()));
-                        mapParams.put(mapParametersKey.getKey(), 1);
-                        mapParametersKey.increment();
-                    }
-                    break;
-
-                case sortby:
-                    switch (Integer.parseInt(entry.getValue())) {
-                        case NEWEST:
-                            sortBy = " order by p.publicationDate desc";
-                            break;
-                        case POPULARITY:
-                            sortBy = " order by p.ratings desc";
-                            break;
-                        case LOW_TO_HIGH:
-                            sortBy = " order by p.price asc";
-                            break;
-                        case HIGH_TO_LOW:
-                            sortBy = " order by p.price desc";
-                            break;
-                    }
-                    break;
-
-                case page:
-                    pageInfo = entry.getValue().split(",");
-                    System.out.println("pageInfo[0] = " + pageInfo[0] + ", pageInfo[1] = " + pageInfo[1]);
-                    break;
-
-                default:
-                    System.out.println("UnsupportedType");
-            }
-        }
-
-        System.out.println("condition = " + String.join(" AND ", conditions));
-
-        if (conditions.isEmpty()) {
-            return null;
+        for (String id : product_ids_str) {
+            productIds.add(Integer.valueOf(id));
         }
 
         TypedQuery<ProductInfo> query = entityManager.createQuery(
-                "select p from ProductInfo p where "
-                + String.join(" AND ", conditions) + sortBy, ProductInfo.class);
-
-        mapParams.forEach(query::setParameter);
-
-        if (pageInfo != null && pageInfo.length == 2) {
-            return query.setFirstResult(Integer.parseInt(pageInfo[0]))
-                    .setMaxResults(Integer.parseInt(pageInfo[1]))
-                    .getResultList();
-        }
+                "SELECT p FROM ProductInfo p WHERE p.id IN (?1)", ProductInfo.class);
+        query.setParameter(1, productIds);
 
         return query.getResultList();
+    }
+
+    private ParamsToQueryContext filterAndGetConditionMap(ProductQueryHelper productQueryHelper,
+                                                          HashMap<String, String> conditionMap,
+                                                          String queryParam) {
+        Map<String, String> filterConditionMap = null;
+
+        if (conditionMap.containsKey(queryParam)) {
+            filterConditionMap = conditionMap.entrySet()
+                    .stream()
+                    .filter(map -> !map.getKey().equals(queryParam))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+            if (!filterConditionMap.containsKey("brands") && !filterConditionMap.containsKey("genders")
+                    && !filterConditionMap.containsKey("apparels") && !filterConditionMap.containsKey("prices")) {
+                filterConditionMap.put("category", "all");
+            }
+        }
+
+        ParamsToQueryContext paramsToQueryContext;
+        if (filterConditionMap != null) {
+            paramsToQueryContext =
+                    productQueryHelper.getParamsToQueryMap((HashMap<String, String>) filterConditionMap);
+        } else {
+            paramsToQueryContext = productQueryHelper.getParamsToQueryMap(conditionMap);
+        }
+
+        return paramsToQueryContext;
+    }
+
+    public FilterAttributesResponse getFilterAttributesByProducts(HashMap<String, String> conditionMap) {
+        ProductQueryHelper productQueryHelper = new ProductQueryHelper();
+        ListResultTransformer listResultTransformer = new ListResultTransformer();
+
+        ParamsToQueryContext paramsToQueryContext = filterAndGetConditionMap(productQueryHelper,
+                conditionMap, "brands");
+
+        List<FilterAttributesWithTotalItemsDTO>
+                brandList = listResultTransformer.getFilterAttributesWithTotalItemsResultTransformer(
+                "SELECT p.productBrandCategory.id, p.productBrandCategory.type, count(*) as totalItems " +
+                        "from ProductInfo p where " +
+                        String.join(" AND ", paramsToQueryContext.getConditions()) +
+                        "group by p.productBrandCategory.id, p.productBrandCategory.type order by totalItems desc",
+                paramsToQueryContext.getMapParams(), entityManager);
+
+        paramsToQueryContext = filterAndGetConditionMap(productQueryHelper, conditionMap, "genders");
+        List<FilterAttributesWithTotalItemsDTO>
+                genderList = listResultTransformer.getFilterAttributesWithTotalItemsResultTransformer(
+                "SELECT p.genderCategory.id, p.genderCategory.type, count(*) as totalItems " +
+                        "from ProductInfo p where " + String.join(" AND ", paramsToQueryContext.getConditions()) +
+                        "group by p.genderCategory.id, p.genderCategory.type order by totalItems desc",
+                paramsToQueryContext.getMapParams(), entityManager);
+
+        paramsToQueryContext = filterAndGetConditionMap(productQueryHelper, conditionMap, "apparels");
+        List<FilterAttributesWithTotalItemsDTO>
+                apparelList = listResultTransformer.getFilterAttributesWithTotalItemsResultTransformer(
+                "SELECT p.apparelCategory.id, p.apparelCategory.type, count(*) as totalItems " +
+                        "from ProductInfo p where " + String.join(" AND ", paramsToQueryContext.getConditions()) +
+                        "group by p.apparelCategory.id, p.apparelCategory.type order by totalItems desc",
+                paramsToQueryContext.getMapParams(), entityManager);
+
+        paramsToQueryContext = filterAndGetConditionMap(productQueryHelper, conditionMap, "prices");
+        List<FilterAttributesWithTotalItemsDTO>
+                priceList = listResultTransformer.getFilterAttributesWithTotalItemsResultTransformer(
+                "SELECT p.priceRangeCategory.id, p.priceRangeCategory.type, count(*) as totalItems " +
+                        "from ProductInfo p where " + String.join(" AND ", paramsToQueryContext.getConditions()) +
+                        "group by p.priceRangeCategory.id, p.priceRangeCategory.type order by p.priceRangeCategory.id",
+                paramsToQueryContext.getMapParams(), entityManager);
+
+        FilterAttributesResponse filterAttributesResponse = new FilterAttributesResponse();
+        filterAttributesResponse.setBrands(brandList);
+        filterAttributesResponse.setGenders(genderList);
+        filterAttributesResponse.setApparels(apparelList);
+        filterAttributesResponse.setPrices(priceList);
+
+        return filterAttributesResponse;
+    }
+
+    private BrandsAndApparelsDTO getBrandsAndApparelsList(int gender_id) {
+        BrandsAndApparelsDTO brandsAndApparelsDTO = new BrandsAndApparelsDTO();
+        HashMap<Integer, Object> mapParams = new HashMap<>(Map.of(1, gender_id));
+        ListResultTransformer listResultTransformer = new ListResultTransformer();
+
+        brandsAndApparelsDTO.setBrands(listResultTransformer.getFilterAttributesResultTransformer(
+                "SELECT DISTINCT p.productBrandCategory.id, p.productBrandCategory.type " +
+                        "from ProductInfo p where p.genderCategory.id=?1" +
+                        " group by p.productBrandCategory.id, p.productBrandCategory.type" +
+                        " order by count(*) desc", mapParams, entityManager));
+
+        brandsAndApparelsDTO.setApparels(listResultTransformer.getFilterAttributesResultTransformer(
+                "SELECT DISTINCT p.apparelCategory.id, p.apparelCategory.type " +
+                        "from ProductInfo p where p.genderCategory.id=?1 " +
+                        "group by p.apparelCategory.id, p.apparelCategory.type " +
+                        "order by count(*) desc", mapParams, entityManager));
+
+        return brandsAndApparelsDTO;
+    }
+
+    public HomeTabsDataResponse getBrandsAndApparelsByGender() {
+        HomeTabsDataResponse homeTabsDataResponse = new HomeTabsDataResponse();
+
+        homeTabsDataResponse.setWomen(getBrandsAndApparelsList(1));
+        homeTabsDataResponse.setMen(getBrandsAndApparelsList(2));
+        homeTabsDataResponse.setGirls(getBrandsAndApparelsList(3));
+        homeTabsDataResponse.setBoys(getBrandsAndApparelsList(4));
+        homeTabsDataResponse.setHomeAndLiving(getBrandsAndApparelsList(5));
+        homeTabsDataResponse.setEssentials(getBrandsAndApparelsList(6));
+        return homeTabsDataResponse;
+    }
+
+    public List<SearchSuggestionForThreeAttrDTO> getGenderApparelBrandByIdAndName() {
+        ListResultTransformer listResultTransformer = new ListResultTransformer();
+
+        return listResultTransformer.getSearchSuggestionForThreeAttrResultTransformer("SELECT DISTINCT " +
+                        " p.genderCategory.id, p.genderCategory.type," +
+                        " p.apparelCategory.id, p.apparelCategory.type," +
+                        " p.productBrandCategory.id, p.productBrandCategory.type from ProductInfo p"
+                , entityManager);
+    }
+
+    public List<SearchSuggestionForTwoAttrDTO> getGenderAndApparelByIdAndName() {
+        ListResultTransformer listResultTransformer = new ListResultTransformer();
+        return listResultTransformer.getSearchSuggestionForTwoAttrResultTransformer("SELECT DISTINCT " +
+                        " p.genderCategory.id, p.genderCategory.type," +
+                        " p.apparelCategory.id, p.apparelCategory.type" +
+                        " from ProductInfo p"
+                , entityManager);
+    }
+
+    public List<SearchSuggestionForTwoAttrDTO> getGenderAndBrandByIdAndName() {
+        ListResultTransformer listResultTransformer = new ListResultTransformer();
+        return listResultTransformer.getSearchSuggestionForTwoAttrResultTransformer("SELECT DISTINCT " +
+                        " p.genderCategory.id, p.genderCategory.type," +
+                        " p.productBrandCategory.id, p.productBrandCategory.type" +
+                        " from ProductInfo p"
+                , entityManager);
+    }
+
+    public List<SearchSuggestionForTwoAttrDTO> getApparelAndBrandByIdAndName() {
+        ListResultTransformer listResultTransformer = new ListResultTransformer();
+        return listResultTransformer.getSearchSuggestionForTwoAttrResultTransformer("SELECT DISTINCT " +
+                        " p.apparelCategory.id, p.apparelCategory.type," +
+                        " p.productBrandCategory.id, p.productBrandCategory.type" +
+                        " from ProductInfo p"
+                , entityManager);
     }
 }

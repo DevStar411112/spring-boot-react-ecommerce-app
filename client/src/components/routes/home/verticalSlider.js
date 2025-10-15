@@ -2,9 +2,10 @@ import React from 'react';
 import Swiper from 'react-id-swiper';
 import log from 'loglevel';
 import {useSelector} from "react-redux";
+import {BadRequest} from "../../ui/error/badRequest";
 
 const VerticalSlider = () => {
-    const homeAPIData = useSelector(state => state.homeScreenReducer? state.homeScreenReducer : null)
+    const homeAPIData = useSelector(state => state.homePageDataReducer)
 
     const params = {
         spaceBetween: 30,
@@ -23,36 +24,29 @@ const VerticalSlider = () => {
         }
     }
 
-    if (!homeAPIData) {
-        log.debug("[VerticalSlider]: homeAPIData is null")
-        return null
-    } else if (!homeAPIData.carousels) {
-        log.debug("[VerticalSlider]: homeAPIData.carousels is null")
-        return null
-    }
-
     const renderImageList = (imageList) => {
-        if (imageList == null) {
-            log.debug("[VerticalSlider]: imageList is null")
-            return null
+
+        if(!imageList) {
+            log.info(`[VerticalSlider]: imageList is null`)
+            return <BadRequest/>
         }
 
         // filter out images which are not for carousels.
-        // eslint-disable-next-line array-callback-return
-        imageList = imageList.filter(image => { if(image.filePath.search("icon") === -1) return image})
+        imageList = imageList.filter(image => image.imageLocalPath.search("icon") === -1)
+
         log.trace("[VerticalSlider]: Rendering renderImageList imageList = " + JSON.stringify(imageList))
-        return imageList.map(({id, filePath}) => {
-            log.trace(`[VerticalSlider]: Rendering renderImageList imageList filePath = ${filePath}`)
+        return imageList.map(({id, imageLocalPath, imageURL}) => {
+            log.trace(`[VerticalSlider]: Rendering renderImageList imageList filePath = ${imageLocalPath}`)
             return (
-                <img key={id} src={filePath} alt={filePath}/>
+                <img key={id} src={imageURL} alt={imageLocalPath}/>
             )
         });
     };
 
     log.info("[VerticalSlider]: Rendering VerticalSlider Component")
     return (
-        <Swiper {...params} >
-            {renderImageList(homeAPIData.carousels)}
+        <Swiper {...params}>
+            {renderImageList(homeAPIData.data.carousels)}
         </Swiper>
     )
 };

@@ -1,25 +1,27 @@
 package com.ujjaval.ecommerce.commondataservice.service.interfaces;
 
+import com.ujjaval.ecommerce.commondataservice.dto.ProductInfoDTO;
 import com.ujjaval.ecommerce.commondataservice.entity.sql.info.ProductInfo;
 import com.ujjaval.ecommerce.commondataservice.model.FilterAttributesResponse;
+import com.ujjaval.ecommerce.commondataservice.model.HomeTabsDataResponse;
 import com.ujjaval.ecommerce.commondataservice.model.MainScreenResponse;
+import com.ujjaval.ecommerce.commondataservice.model.SearchSuggestionResponse;
 
-import java.awt.print.Pageable;
-import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.List;
 
 public interface CommonDataService {
 
-    public ProductInfo findAddressById(Integer id);
+    MainScreenResponse getHomeScreenData(String apiName);
 
-    public void save();
+    FilterAttributesResponse getFilterAttributesByProducts(String queryParams);
 
-    public MainScreenResponse getMainScreenDataList() throws UnknownHostException;
+    ProductInfoDTO getProductsByCategories(String queryParams);
 
-    public FilterAttributesResponse getFilterAttributesComponentList();
+    HashMap<Integer, ProductInfo> getProductsById(String queryParams);
 
-    public List<ProductInfo> getFilterProductsComponentList(HashMap<String,
-            String> conditionMap) throws UnknownHostException;
+    HomeTabsDataResponse getBrandsAndApparelsByGender(String apiName);
+
+    SearchSuggestionResponse getSearchSuggestionList();
 }
 

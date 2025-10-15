@@ -1,10 +1,7 @@
 package com.ujjaval.ecommerce.commondataservice.model;
 
-import com.ujjaval.ecommerce.commondataservice.entity.sql.categories.PriceRangeCategory;
+import com.ujjaval.ecommerce.commondataservice.dto.FilterAttributesWithTotalItemsDTO;
 import com.ujjaval.ecommerce.commondataservice.entity.sql.categories.SortByCategory;
-import com.ujjaval.ecommerce.commondataservice.entity.sql.categories.ProductBrandCategory;
-import com.ujjaval.ecommerce.commondataservice.entity.sql.categories.GenderCategory;
-import com.ujjaval.ecommerce.commondataservice.entity.sql.categories.ApparelCategory;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -19,19 +16,17 @@ import java.util.List;
 @ToString
 public class FilterAttributesResponse implements Serializable {
 
-    private List<ProductBrandCategory> brands;
-    private List<GenderCategory> genders;
-    private List<ApparelCategory> apparels;
-    private List<SortByCategory> sorts;
-    private List<PriceRangeCategory> priceRanges;
+    private List<FilterAttributesWithTotalItemsDTO> brands;
+    private List<FilterAttributesWithTotalItemsDTO> genders;
+    private List<FilterAttributesWithTotalItemsDTO> apparels;
+    private List<SortByCategory> sortby;
+    private List<FilterAttributesWithTotalItemsDTO> prices;
 
-    public FilterAttributesResponse(List<ProductBrandCategory> brands, List<GenderCategory> genders,
-                                    List<ApparelCategory> apparels, List<SortByCategory> sorts,
-                                    List<PriceRangeCategory> priceRanges) {
+    public FilterAttributesResponse(List<FilterAttributesWithTotalItemsDTO> brands, List<FilterAttributesWithTotalItemsDTO> genders,
+                                    List<FilterAttributesWithTotalItemsDTO> apparels, List<FilterAttributesWithTotalItemsDTO> prices) {
         this.brands = brands;
         this.genders = genders;
         this.apparels = apparels;
-        this.sorts = sorts;
-        this.priceRanges = priceRanges;
+        this.prices = prices;
     }
 }

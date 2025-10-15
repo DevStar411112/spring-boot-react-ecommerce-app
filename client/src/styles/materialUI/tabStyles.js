@@ -5,18 +5,18 @@ const useTabStyles = makeStyles((theme) => ({
         flexGrow: 1,
     },
     paperRoot: {
-        display: 'flex',
-        flexWrap: 'wrap',
         '& > *': {
-            margin: theme.spacing(0),
-            width: theme.spacing(80),
-            height: theme.spacing(140),
+            width: theme.spacing(45),
+            height: theme.spacing(45),
         },
         position: "fixed",
-        zIndex: 1001,
-        height: '200px',
-        paddingTop: '20px',
-        left: '200px',
+        zIndex: 1201
+    },
+    listItemTextRoot: {
+        '&:hover': {
+            fontWeight: 500
+        },
+        color: "black",
     },
     tabRoot: {
         width: "auto",
@@ -33,12 +33,6 @@ const useTabStyles = makeStyles((theme) => ({
             fontSize: "1rem",
         }
     },
-    tabsFlexContainer: {
-        flexGrow: 1,
-        [theme.breakpoints.up('md')]: {
-            width: "35%",
-        }
-    }
 }));
 
 export default useTabStyles;

@@ -5,15 +5,19 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.io.Serializable;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString
-public class ApparelImagesDTO {
+public class ApparelImagesDTO implements Serializable {
 
     private String title;
 
-    private String filePath;
+    private String imageLocalPath;
+
+    private String imageURL;
 
     private ApparelDTO apparelInfo;
 
@@ -25,7 +29,7 @@ public class ApparelImagesDTO {
 @Setter
 @NoArgsConstructor
 @ToString
-class ApparelDTO {
+class ApparelDTO implements Serializable {
     private int id;
 }
 
@@ -33,7 +37,7 @@ class ApparelDTO {
 @Setter
 @NoArgsConstructor
 @ToString
-class GenderDTO {
+class GenderDTO implements Serializable {
     private int id;
 }
 

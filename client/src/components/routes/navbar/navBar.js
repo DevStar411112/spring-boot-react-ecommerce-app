@@ -1,272 +1,353 @@
 import React, {useEffect} from "react";
 
-import LocalMallIcon from '@material-ui/icons/LocalMall';
 import SearchIcon from '@material-ui/icons/Search';
 import AccountCircle from '@material-ui/icons/AccountCircle';
-import MenuItem from '@material-ui/core/MenuItem';
-import Menu from '@material-ui/core/Menu';
+import {Grid} from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
 import MoreIcon from '@material-ui/icons/MoreVert';
-import ArrowForwardIcon from '@material-ui/icons/ArrowForward';
 import Cookies from 'js-cookie';
-import {setTokenFromCookie, signOut} from '../../../actions';
-import {connect} from 'react-redux'
+import {
+    getDataViaAPI, setAuthDetailsFromCookie,
+    signOut, signOutUsingOAuth, setDefaultSearchSuggestions
+} from '../../../actions';
+import {connect, useDispatch} from 'react-redux'
 
 import {
-    AppBar, Toolbar, IconButton, Typography,
-    InputBase, Badge
+    AppBar, Toolbar, IconButton, Typography
 } from '@material-ui/core';
 
 import useNavBarStyles from "../../../styles/materialUI/navBarStyles";
 import TabList from "./tabList";
 import {Link} from "react-router-dom";
 import {useSelector} from "react-redux";
-import {HANDLE_TOKEN_ID} from "../../../actions/types";
+import {ADD_TO_CART, LOAD_TABS_DATA, SET_GOOGLE_AUTH} from "../../../actions/types";
 import log from "loglevel";
 import Hidden from "@material-ui/core/Hidden";
-
-// css styles
-const iconButtonLabel = {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    fontSize: '0.8rem',
-    fontWeight: 'bold',
-    paddingLeft: '10px'
-};
+import BagButton from "./bagButton";
+import {tabsDataReducer} from "../../../reducers/screens/commonScreenReducer";
+import {HTTPError} from "../../ui/error/httpError";
+import {BadRequest} from "../../ui/error/badRequest";
+import SearchBar from "./searchBar";
+import SideBar from "./sideBar";
+import {SHOPPERS_PRODUCT_INFO_COOKIE, AUTH_DETAILS_COOKIE} from "../../../constants/cookies";
+import {TABS_DATA_API} from "../../../constants/api_routes";
+import {TABS_API_OBJECT_LEN} from "../../../constants/constants"
+import Avatar from '@material-ui/core/Avatar';
+import history from "../../../history";
+import MobileMenu from "./mobileMenu";
 
 const NavBar = props => {
     const classes = useNavBarStyles();
-    const [anchorEl, setAnchorEl] = React.useState(null);
-    const [mobileSearchState, setMobileSearchState] = React.useState(false);
-    const [mobileMoreAnchorEl, setMobileMoreAnchorEl] = React.useState(null);
-    const {isSignedIn, tokenId} = useSelector(state => state.authApiReducer)
 
-    const isMenuOpen = Boolean(anchorEl);
+    const [mobileSearchState, setMobileSearchState] = React.useState(false);
+    const [hamburgerBtnState, setHamburgerBtnState] = React.useState(false);
+
+    const {isSignedIn, tokenId, firstName} = useSelector(state => state.signInReducer)
+    const googleAuthReducer = useSelector(state => state.googleAuthReducer)
+    const tabsAPIData = useSelector(state => state.tabsDataReducer)
+
+    const dispatch = useDispatch()
+
+    let authIcon = null
+    let authLabel = null
+    const mobileMenuId = 'primary-search-account-menu-mobile';
+    const [mobileMoreAnchorEl, setMobileMoreAnchorEl] = React.useState(null);
     const isMobileMenuOpen = Boolean(mobileMoreAnchorEl);
 
+    /**
+     * set the cart from saved Cookie
+     */
+    const setAddToCartValuesFromCookie = () => {
+        let savedProductsFromCookie = Cookies.get(SHOPPERS_PRODUCT_INFO_COOKIE)
+        let totalQuantity = 0
+        if (savedProductsFromCookie) {
+            savedProductsFromCookie = JSON.parse(savedProductsFromCookie)
+
+            for (const [, qty] of Object.entries(savedProductsFromCookie.productQty)) {
+                totalQuantity += parseInt(qty)
+            }
+            savedProductsFromCookie.totalQuantity = totalQuantity
+
+            log.info(`[BagButton] savedProductsFromCookie = ${JSON.stringify(savedProductsFromCookie)}`)
+
+            dispatch({
+                type: ADD_TO_CART,
+                payload: savedProductsFromCookie
+            })
+        }
+    }
+
+    /**
+     * This will execute only once.
+     */
     useEffect(() => {
         log.info(`[NavBar]: Component did update.`)
+
+        if (!googleAuthReducer.oAuth) {
+            window.gapi.load('client:auth2', () => {
+                window.gapi.client.init({
+                    clientId: process.env.REACT_APP_GOOGLE_AUTH_CLIENT_ID,
+                    scope: 'profile'
+                }).then(() => {
+                    const auth = window.gapi.auth2.getAuthInstance();
+                    dispatch({
+                        type: SET_GOOGLE_AUTH,
+                        payload: {
+                            firstName: auth.currentUser.get().getBasicProfile() ?
+                                auth.currentUser.get().getBasicProfile().getGivenName() : null,
+                            oAuth: auth
+                        }
+                    })
+                }).catch(function () {
+                    log.error(`[Navbar] Failed to load google OAuth`)
+                })
+            });
+        }
+
         if (isSignedIn === null) {
+            // if user is not signed in then signed it in using
+            // account details from the cookie.
+
             log.info(`[NavBar]: isSignedIn is null`)
-            let tokenIdFromCookie = Cookies.get(HANDLE_TOKEN_ID)
-            if (tokenIdFromCookie) {
-                log.info(`[NavBar]: Token set from Cookie`)
-                props.setTokenFromCookie(tokenIdFromCookie)
+            let savedAuthDetails = Cookies.get(AUTH_DETAILS_COOKIE)
+            if (savedAuthDetails) {
+                log.info(`[NavBar]: setting Auth Details from Cookie`)
+                props.setAuthDetailsFromCookie(JSON.parse(savedAuthDetails))
             }
         }
-        // eslint-disable-next-line
-    }, [isSignedIn]);
 
-    const handleProfileMenuOpen = (event) => {
-        setAnchorEl(event.currentTarget);
-    };
+        // tabs data is not loaded then load it.
+        if (!tabsAPIData.hasOwnProperty("data")) {
+            props.getDataViaAPI(LOAD_TABS_DATA, TABS_DATA_API, null, false)
+        }
+
+        // set the cart values
+        setAddToCartValuesFromCookie()
+
+        // set default search suggestions
+        props.setDefaultSearchSuggestions()
+
+        // eslint-disable-next-line
+    }, [isSignedIn, tabsDataReducer]);
+
+    if (tabsAPIData.isLoading) {
+        log.info("[NavBar]: loading")
+        return null
+    } else {
+        if (tabsAPIData.hasOwnProperty("data")) {
+            if (Object.entries(tabsAPIData.data).length !== TABS_API_OBJECT_LEN) {
+
+                log.info(`[NavBar]: tabsAPIData.data length didn't matched` +
+                    `actual length = ${Object.entries(tabsAPIData.data).length},` +
+                    `expected length = ${TABS_API_OBJECT_LEN}`)
+
+                return <BadRequest/>
+            }
+        } else {
+            if (tabsAPIData.hasOwnProperty("statusCode")) {
+                log.info(`[NavBar]: tabsAPIData.statusCode = ${tabsAPIData.statusCode}`)
+                props.errorHandler()
+                return <HTTPError statusCode={tabsAPIData.statusCode}/>
+            }
+        }
+    }
+
+    if (isSignedIn || googleAuthReducer.isSignedInUsingOAuth) {
+        let fName
+        if (firstName) {
+            fName = firstName
+        } else if (googleAuthReducer.isSignedInUsingOAuth) {
+            fName = googleAuthReducer.firstName
+        } else {
+            fName = "S"
+        }
+
+        authIcon = <Avatar sizes="small"
+                           style={{
+                               width: 20, height: 20,
+                               backgroundColor: "orange",
+                               filter: "saturate(5)"
+                           }}>
+
+            {fName.charAt(0).toUpperCase()}
+        </Avatar>
+        authLabel = "Sign Out"
+    } else {
+        authIcon = <AccountCircle/>
+        authLabel = "Sign In"
+    }
+
+    const changeAuthStatusHandler = () => {
+        log.info(`[Navbar] handleSignOutClick isSignedIn = ${googleAuthReducer.isSignedInUsingOAuth}`)
+        if (googleAuthReducer.isSignedInUsingOAuth) {
+            props.signOutUsingOAuth(googleAuthReducer.oAuth)
+        } else if (tokenId && isSignedIn) {
+            props.signOut()
+        } else {
+            history.push("/signin")
+        }
+        handleMobileMenuClose();
+    }
+
+    const changePageToShoppingBagHandler = () => {
+        history.push("/shopping-bag")
+        setMobileMoreAnchorEl(null);
+    }
 
     const handleMobileMenuClose = () => {
         setMobileMoreAnchorEl(null);
     };
 
-    const handleMenuClose = () => {
-        setAnchorEl(null);
-        handleMobileMenuClose();
-    };
-
-    const handleLoginStatus = () => {
-        if (tokenId && isSignedIn) {
-            props.signOut()
-        }
-        setAnchorEl(null);
-        handleMobileMenuClose();
-    }
-
     const handleMobileMenuOpen = (event) => {
         setMobileMoreAnchorEl(event.currentTarget);
     };
 
-    const menuId = 'primary-search-account-menu';
-    const renderMenu = (
-        <Menu
-            anchorEl={anchorEl}
-            anchorOrigin={{vertical: 'top', horizontal: 'right'}}
-            id={menuId}
-            keepMounted
-            transformOrigin={{vertical: 'top', horizontal: 'right'}}
-            open={isMenuOpen}
-            onClose={handleMenuClose}
-        >
-            <Link to={!tokenId ? "/login" : "/"}>
-                <MenuItem onClick={handleLoginStatus}>{!tokenId ? 'Login' : 'Logout'}</MenuItem>
-            </Link>
-            <MenuItem onClick={handleMenuClose}>My account</MenuItem>
-        </Menu>
-    );
+    const handleMobileSearchClose = () => {
+        log.info("handleMobileSearchClose is invoked.....")
+        setMobileSearchState(false)
+    }
 
-    const mobileMenuId = 'primary-search-account-menu-mobile';
-    const renderMobileMenu = (
-        <Menu
-            anchorEl={mobileMoreAnchorEl}
-            anchorOrigin={{vertical: 'top', horizontal: 'right'}}
-            id={mobileMenuId}
-            keepMounted
-            transformOrigin={{vertical: 'top', horizontal: 'right'}}
-            open={isMobileMenuOpen}
-            onClose={handleMobileMenuClose}
-        >
-            <MenuItem onClick={handleProfileMenuOpen}>
-                <IconButton
-                    aria-label="account of current user"
-                    aria-controls="primary-search-account-menu"
-                    aria-haspopup="true"
-                    color="inherit"
-                >
-                    <AccountCircle/>
-                </IconButton>
-                <p>Login</p>
-            </MenuItem>
-            <MenuItem>
-                <IconButton aria-label="show 11 new notifications" color="inherit">
-                    <Badge badgeContent={11} color="secondary">
-                        <LocalMallIcon/>
-                    </Badge>
-                </IconButton>
-                <p>Bag</p>
-            </MenuItem>
-        </Menu>
-    );
-
-    const handleMobileSearch = () => {
-        log.info("Mobile Search is clicked....")
+    const handleMobileSearchOpen = () => {
         setMobileSearchState(true)
     }
 
     const renderMobileSearchInputField = () => {
-        if (!mobileSearchState) {
-            return null
+        if (mobileSearchState) {
+            return <SearchBar size="medium" device="mobile" handleClose={handleMobileSearchClose}/>
         }
         return (
-            <InputBase
-                placeholder="Search for products, brands and more"
-                classes={{
-                    root: classes.inputRoot,
-                    input: classes.inputInput
-                }}
-                inputProps={{"aria-label": "search"}}/>
+            <>
+                <Grid item>
+                    <IconButton onClick={handleMobileSearchOpen}
+                                edge="end">
+                        <SearchIcon fontSize="large"/>
+                    </IconButton>
+                </Grid>
+                <Grid item>
+                    <IconButton
+                        aria-label="show more"
+                        aria-controls={mobileMenuId}
+                        aria-haspopup="true"
+                        onClick={handleMobileMenuOpen}
+                        color="inherit"
+                        edge="end">
+                        <MoreIcon fontSize="large"/>
+                    </IconButton>
+                </Grid>
+            </>
+        )
+    }
+
+    const handleSidebarOpen = () => {
+        log.info(`[NavBar] opening sidebar`)
+        setHamburgerBtnState(true)
+    }
+
+    const handleSidebarClose = () => {
+        log.info(`[NavBar] clickAwayListener is triggered`)
+        setHamburgerBtnState(false)
+    }
+
+    const renderIndependentElem = (eventHandler, icon, label, paddingTop) => {
+        return (
+            <Grid item>
+                <Grid container direction="column" alignItems="center"
+                      onClick={eventHandler} style={{cursor: 'pointer'}}>
+                    <Grid item style={{height: 21, width: 21, paddingTop: paddingTop}}>
+                        {icon}
+                    </Grid>
+                    <Grid item style={{color: "black", fontSize: "0.8rem", fontWeight: 'bold'}}>
+                        {label}
+                    </Grid>
+                </Grid>
+            </Grid>
         )
     }
 
     log.info(`[NavBar]: Rendering NavBar Component`)
     return (
-        <div style={{paddingBottom: 80}}>
-            <AppBar color="default" className={classes.appBarRoot}>
-                <Toolbar classes={{root: classes.toolBarRoot}}>
-                    <Hidden mdUp>
-                        <IconButton
-                            edge="start"
-                            className={classes.menuButton}
-                            color="inherit"
-                            aria-label="open drawer"
-                        >
-                            <MenuIcon fontSize="large"/>
-                        </IconButton>
-                    </Hidden>
+        <>
+            <SideBar open={hamburgerBtnState} closeHandler={handleSidebarClose}/>
 
-                    <Link to="/">
-                        <Typography className={classes.title}>
-                            Shoppers
-                        </Typography>
-                    </Link>
+            <div style={{paddingBottom: 80}}>
+                <AppBar color="default" className={classes.appBarRoot}>
+                    <Toolbar classes={{root: classes.toolBarRoot}}>
+                        <Grid container alignItems="center">
+                            <Hidden lgUp>
+                                {!mobileSearchState ?
+                                    <Grid item>
+                                        <IconButton
+                                            edge="start"
+                                            className={classes.menuButton}
+                                            color="inherit"
+                                            aria-label="open drawer"
+                                            onClick={handleSidebarOpen}>
+                                            <MenuIcon fontSize="large"/>
+                                        </IconButton>
+                                    </Grid> : null}
+                            </Hidden>
 
-                    <div className={classes.growQuarter}/>
+                            {!mobileSearchState ? <Grid item>
+                                <Link to="/">
+                                    <Typography className={classes.title}>
+                                        Shoppers
+                                    </Typography>
+                                </Link>
+                            </Grid> : null}
 
-                    <Hidden mdDown>
-                        <TabList/>
-                    </Hidden>
+                            <div className={classes.growHalf}/>
 
-                    <div className={classes.grow_1}/>
+                            <Hidden mdDown>
+                                <Grid item xs={5}>
+                                    <TabList/>
+                                </Grid>
 
-                    <Hidden xsDown>
-                        <div className={classes.searchContainer}>
-                            <div className={classes.search}>
-                                <div className={classes.searchIcon}>
-                                    <SearchIcon fontSize="large"/>
-                                </div>
-                                <InputBase
-                                    placeholder="Search for products, brands and more"
-                                    classes={{
-                                        root: classes.inputRoot,
-                                        input: classes.inputInput
-                                    }}
-                                    inputProps={{"aria-label": "search"}}/>
-                            </div>
-                            <div className={classes.arrowIcon}>
-                                <IconButton size="medium">
-                                    <ArrowForwardIcon fontSize="large"/>
-                                </IconButton>
-                            </div>
-                        </div>
-                    </Hidden>
+                                <div className={classes.growHalf}/>
+                            </Hidden>
 
-                    <Hidden smUp>
-                        <div className={classes.mobileSearchContainer}>
-                            <div className={classes.mobileSearchButton}>
-                                <IconButton size="medium"
-                                            onClick={handleMobileSearch}
-                                            edge="end">
-                                    <SearchIcon fontSize="large"/>
-                                </IconButton>
-                            </div>
-                            {renderMobileSearchInputField()}
-                        </div>
-                    </Hidden>
+                            <Hidden xsDown>
+                                <Grid item container sm={6} md={7} lg={4}>
+                                    <SearchBar size="small"/>
+                                </Grid>
+                            </Hidden>
 
-                    <div className={classes.grow_1}/>
+                            <Hidden smUp>
+                                <div className={classes.growHalf}/>
+                                <div className={classes.growHalf}/>
+                                {renderMobileSearchInputField()}
+                            </Hidden>
 
-                    <div className={classes.sectionDesktop}>
-                        <div style={iconButtonLabel}>
-                            <IconButton
-                                aria-label="account of current user"
-                                aria-haspopup="true"
-                                size="medium"
-                                color="inherit"
-                                onClick={handleProfileMenuOpen}
-                                classes={{root: classes.iconButtonRoot}}
-                            >
-                                <AccountCircle/>
-                            </IconButton>
-                            Profile
-                        </div>
-                        <div style={iconButtonLabel}>
-                            <IconButton aria-label="show 17 new notifications"
-                                        color="inherit"
-                                        classes={{root: classes.iconButtonRoot}}>
-                                <Badge badgeContent={17} color="secondary">
-                                    <LocalMallIcon/>
-                                </Badge>
-                            </IconButton>
-                            Bag
-                        </div>
-                    </div>
+                            <Hidden xsDown>
+                                <div className={classes.growHalf}/>
 
+                                {renderIndependentElem(changeAuthStatusHandler, authIcon, authLabel,
+                                    2)}
 
-                    <div className={classes.sectionMobile}>
-                        <IconButton
-                            aria-label="show more"
-                            aria-controls={mobileMenuId}
-                            aria-haspopup="true"
-                            onClick={handleMobileMenuOpen}
-                            color="inherit"
-                            edge="end"
-                        >
-                            <MoreIcon fontSize="large"/>
-                        </IconButton>
-                    </div>
-                </Toolbar>
-            </AppBar>
-            {renderMobileMenu}
-            {renderMenu}
-        </div>
+                                <div className={classes.growQuarter}/>
+
+                                {renderIndependentElem(changePageToShoppingBagHandler, <BagButton/>,
+                                    "Bag", 0)}
+                            </Hidden>
+
+                        </Grid>
+                    </Toolbar>
+                </AppBar>
+
+                <MobileMenu mobileMenuId={mobileMenuId}
+                            authIcon={authIcon}
+                            authLabel={authLabel}
+                            authBtnHandler={changeAuthStatusHandler}
+                            bagBtnHandler={changePageToShoppingBagHandler}
+                            mobileMoreAnchorEl={mobileMoreAnchorEl}
+                            isMobileMenuOpen={isMobileMenuOpen}
+                            handleMobileMenuClose={handleMobileMenuClose}
+                />
+            </div>
+        </>
     );
 };
 
-export default connect(null, {setTokenFromCookie, signOut})(NavBar);
+export default connect(null, {
+    setAuthDetailsFromCookie, signOut,
+    signOutUsingOAuth, getDataViaAPI, setDefaultSearchSuggestions
+})(NavBar);

@@ -1,30 +1,29 @@
 package com.ujjaval.ecommerce.commondataservice.controller;
 
-import com.sun.net.httpserver.Authenticator;
+import com.ujjaval.ecommerce.commondataservice.dto.ProductInfoDTO;
 import com.ujjaval.ecommerce.commondataservice.entity.sql.info.ProductInfo;
 import com.ujjaval.ecommerce.commondataservice.model.FilterAttributesResponse;
+import com.ujjaval.ecommerce.commondataservice.model.HomeTabsDataResponse;
 import com.ujjaval.ecommerce.commondataservice.model.MainScreenResponse;
+import com.ujjaval.ecommerce.commondataservice.model.SearchSuggestionResponse;
 import com.ujjaval.ecommerce.commondataservice.service.interfaces.CommonDataService;
 import com.ujjaval.ecommerce.commondataservice.service.interfaces.LoadFakeDataService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.servlet.http.HttpServletRequest;
-import java.io.IOException;
-import java.net.UnknownHostException;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
 @RestController
 public class CommonDataController {
+
+    @Autowired
+    Environment environment;
 
     @Autowired
     CommonDataService commonDataService;
@@ -32,77 +31,81 @@ public class CommonDataController {
     @Autowired
     LoadFakeDataService loadFakeDataService;
 
-    @GetMapping("/load")
-    public ResponseEntity<?> loadTestData() {
-
-        if (!loadFakeDataService.loadTestData()) {
-            return new ResponseEntity<Error>(HttpStatus.CONFLICT);
+    public void fillWithTestData() {
+        if (Objects.equals(environment.getProperty("ACTIVE_PROFILE"), "dev")) {
+            loadFakeDataService.loadTestData();
         }
-
-        return new ResponseEntity<Authenticator.Success>(HttpStatus.OK);
     }
 
-    @GetMapping("/products")
-    public ResponseEntity<?> getFilterProductsComponent(@RequestParam("q") String queryParams) throws UnknownHostException {
-        HashMap<String, String> conditionMap = new HashMap<>();
+    @GetMapping(value = "/products", params = "q")
+    public ResponseEntity<?> getProductsByCategories(@RequestParam("q") String queryParams) {
 
-        String[] separatedConditions = queryParams.split("::");
+        ProductInfoDTO productInfoDTO = commonDataService.getProductsByCategories(queryParams);
 
-        if (separatedConditions.length == 0 && !queryParams.isEmpty()) {
-            String[] categories = queryParams.split("=");
-            if (categories.length > 1) {
-                conditionMap.put(categories[0], categories[1]);
-            }
-
-        } else {
-            for (String condition : separatedConditions) {
-                String[] categories = condition.split("=");
-                if (categories.length > 1) {
-                    conditionMap.put(categories[0], categories[1]);
-                }
-            }
+        if (productInfoDTO == null) {
+            return ResponseEntity.badRequest().body("Query has not followed the required format.");
         }
 
-        List<ProductInfo> productInfoList = commonDataService.getFilterProductsComponentList(conditionMap);
-
-        if (productInfoList == null) {
-            return new ResponseEntity<Error>(HttpStatus.CONFLICT);
-        }
-        return ResponseEntity.ok(productInfoList);
+        return ResponseEntity.ok(productInfoDTO);
     }
 
-    @GetMapping(value = "/web-images/**")
-    public ResponseEntity<InputStreamResource> getWebImage(HttpServletRequest request) throws IOException {
-        String mediaType = "image/webp";
-        String[] uriSplit =  request.getRequestURI().split("/", 3);
-        var imgFile = new ClassPathResource(String.format("static/images/%s", uriSplit[2]));
-        return ResponseEntity
-                .ok()
-                .contentType(MediaType.parseMediaType(mediaType))
-                .body(new InputStreamResource(imgFile.getInputStream()));
+    @GetMapping(value = "/products", params = "product_id")
+    public ResponseEntity<?> getProductsById(@RequestParam("product_id") String queryParams) {
+
+        HashMap<Integer, ProductInfo> resultMap = commonDataService.getProductsById(queryParams);
+
+        if (resultMap == null) {
+            return ResponseEntity.badRequest().body("Query has not followed the required format.");
+        }
+
+        return ResponseEntity.ok(resultMap);
     }
 
     @GetMapping("/home")
-    public ResponseEntity<?> getMainScreenData() throws UnknownHostException {
-        MainScreenResponse mainScreenInfoList = commonDataService.getMainScreenDataList();
+    public ResponseEntity<?> getMainScreenData() {
+        MainScreenResponse mainScreenInfoList = commonDataService.getHomeScreenData("homeAPI");
         if (mainScreenInfoList == null) {
             return new ResponseEntity<Error>(HttpStatus.CONFLICT);
         }
+
         return ResponseEntity.ok(mainScreenInfoList);
     }
 
-    @GetMapping("/filter")
-    public ResponseEntity<?> getFilterAttributesComponent() throws UnknownHostException {
-        FilterAttributesResponse filterScreenInfoList = commonDataService.getFilterAttributesComponentList();
-        if (filterScreenInfoList == null) {
+    @GetMapping("/tabs")
+    public ResponseEntity<?> getHomeTabsDataResponse() {
+        HomeTabsDataResponse homeTabsDataResponse = commonDataService.getBrandsAndApparelsByGender("tabsAPI");
+        if (homeTabsDataResponse == null) {
             return new ResponseEntity<Error>(HttpStatus.CONFLICT);
         }
-        return ResponseEntity.ok(filterScreenInfoList);
+
+        return ResponseEntity.ok(homeTabsDataResponse);
     }
 
-    @GetMapping("/save")
-    public Object save() {
-        commonDataService.save();
-        return ResponseEntity.status(HttpStatus.OK);
+    @GetMapping(value = "/filter", params = "q")
+    public ResponseEntity<?> getFilterAttributesByProducts(@RequestParam("q") String queryParams) {
+
+        // TODO: Add support for productname parameter for filter selection.
+        String[] splitParams = queryParams.split("=");
+        if(splitParams.length >= 1 && splitParams[0].equals("productname")){
+            queryParams="category=all";
+        }
+
+        FilterAttributesResponse result = commonDataService.getFilterAttributesByProducts(queryParams);
+
+        if (result == null) {
+            return ResponseEntity.badRequest().body("Query has not followed the required format.");
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/search-suggestion-list")
+    public ResponseEntity<?> getSearchSuggestionList() {
+        SearchSuggestionResponse searchSuggestionList = commonDataService.getSearchSuggestionList();
+        if (searchSuggestionList == null) {
+            return new ResponseEntity<Error>(HttpStatus.CONFLICT);
+        }
+
+        return ResponseEntity.ok(searchSuggestionList);
     }
 }

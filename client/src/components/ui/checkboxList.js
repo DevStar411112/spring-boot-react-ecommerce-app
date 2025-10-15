@@ -6,11 +6,10 @@ import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
 import Checkbox from '@material-ui/core/Checkbox';
 import log from "loglevel";
+import {Grid} from "@material-ui/core";
 
 const useStyles = makeStyles((theme) => ({
     root: {
-        width: '100%',
-        maxWidth: 360,
         backgroundColor: theme.palette.background.paper,
     },
     listItemIconRoot: {
@@ -21,23 +20,27 @@ const useStyles = makeStyles((theme) => ({
     }
 }));
 
-const DISPLAY_MAX_ITEMS = 6
-
 export default function CheckboxList(props) {
     const classes = useStyles();
+    const maxItems = props.maxItems ? props.maxItems : 1000
 
     if (!props.attrList) {
         log.debug(`[CheckboxList] props.attrList is null`)
         return null
     }
 
+    /**
+     * toggle the state of the selected attributes
+     * @param id
+     * @returns {function(...[*]=)}
+     */
     const handleToggle = id => () => {
         log.debug(`[CheckboxList] handleToggle for CheckboxList value = ${id}`)
 
         let value
         for (let i = 0; i < props.attrList.length; i++) {
             if (id === props.attrList[i].id) {
-                value = props.attrList[i].type
+                value = props.attrList[i].value
                 log.debug(`[CheckboxList] handleToggle for CheckboxList value = ${value}`)
             }
         }
@@ -50,6 +53,9 @@ export default function CheckboxList(props) {
 
         log.debug(`[CheckboxList] renderCheckBoxList props.selectedAttributes = ${JSON.stringify(props.values)}`)
 
+        // push the selected attributes ID into list
+        // so that if it is present in the list we
+        // can mark as selected
         let selectedIdList = []
         if (props.selectedAttrList.length > 0) {
             props.selectedAttrList.forEach(({id}) => {
@@ -57,13 +63,13 @@ export default function CheckboxList(props) {
             })
         }
 
-        return props.attrList.map(({id, type}) => {
-            if (count === DISPLAY_MAX_ITEMS) {
+        return props.attrList.map(({id, value, totalItems}) => {
+            if (count === maxItems) {
                 return null
             }
             count = count + 1
 
-            log.debug(`[CheckboxList] renderCheckBoxList id = ${id}, type = ${type}` +
+            log.debug(`[CheckboxList] renderCheckBoxList id = ${id}, type = ${value}` +
                 `, props.values.includes(id) = ${selectedIdList.includes(id)}`)
             return (
                 <ListItem classes={{root: classes.listItemRoot}} key={id} role={undefined}
@@ -78,8 +84,15 @@ export default function CheckboxList(props) {
                             inputProps={{'aria-labelledby': id}}
                         />
                     </ListItemIcon>
-                    <ListItemText id={id} primary={type} style={{fontSize: props.fontSize}}
-                                  disableTypography/>
+                    <Grid container alignItems="center">
+                        <Grid item>
+                            <ListItemText id={id} primary={value} style={{fontSize: "0.9rem"}}
+                                          disableTypography/>
+                        </Grid>
+                        <Grid item style={{color: "#94969f", fontSize: "0.8rem", paddingLeft: "0.3rem"}}>
+                            {`(${totalItems})`}
+                        </Grid>
+                    </Grid>
                 </ListItem>
             );
         })
@@ -88,8 +101,7 @@ export default function CheckboxList(props) {
     log.trace(`[CheckboxList] props.attrList = ${JSON.stringify(props.attrList)}`)
     log.debug(`[CheckboxList] Rendering CheckboxList Component`)
     return (
-        <List
-            className={classes.root}>
+        <List style={{padding: "0 0 0 0.7rem"}}>
             {renderCheckBoxList()}
         </List>
     );
