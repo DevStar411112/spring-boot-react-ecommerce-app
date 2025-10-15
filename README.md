@@ -65,11 +65,11 @@ Installation Video: https://youtu.be/nPKYbdKPd0E
 
        REACT_APP_STRIPE_PUBLISH_KEY=<Your Stripe Publishable Key>
 
-       Go [Here](https://dashboard.stripe.com/register) to create a Stripe account.
+       Go [Here]() to create a Stripe account.
        <br/><br/>
        REACT_APP_GOOGLE_AUTH_CLIENT_ID=<Your Google AUTH Client ID>
 
-       Go [Here](https://console.developers.google.com) to create Google OAuth Credentials.
+       Go [Here]() to create Google OAuth Credentials.
 
 3. Build all the microservices and run the app using docker-compose. This is done using ./start-all.sh script which creates the network and set the container dependencies based on the config mention in the docker-compose.yml. 
    This will build all the jar files and run all the services.
@@ -85,26 +85,6 @@ Installation Video: https://youtu.be/nPKYbdKPd0E
     Expiry: Any future date
     CVV: Any 3-digit number
 
-**Steps to deploy on Heroku using docker-compose:**
-
-1. create heroku.yml as docker-compose.yml is not invoked on Heroku.
-
-2. If the application contains a database then install MySQL or any other database 
-   from Heroku marketplace[https://elements.heroku.com].
-   <br/><br/>
-   Note: Before installing you need to add credit/debit card info. Without this it 
-   won't allow you to install the database.
-
-
-3. Set the config vars based on the database URL.
-    
-
-4. Set the stack:container for the application in order to build with docker-compose.
-   ```
-      heroku stack:set container -a <application-name>
-   ```
- 
-5. Deploy individual service on Heroku.
 
 
 **References**  
